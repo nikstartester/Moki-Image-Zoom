@@ -81,7 +81,7 @@ class ImageZoomView @JvmOverloads constructor(
     var isSupportTranslate = SUPPORT_TRANSLATE
 
     /**
-     *  Support zoom flag
+     *  Support rotate flag
      */
     var isSupportRotate = SUPPORT_ROTATE
 
@@ -289,7 +289,7 @@ class ImageZoomView @JvmOverloads constructor(
             }
 
             if (needSkipRotationEvent.not() && event.pointerCount == 2 || event.pointerCount == 3)
-                applyRotate(event)
+                if (isSupportRotate) applyRotate(event)
         }
     }
 
