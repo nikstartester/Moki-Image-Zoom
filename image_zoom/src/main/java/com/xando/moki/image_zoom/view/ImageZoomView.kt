@@ -285,7 +285,7 @@ class ImageZoomView @JvmOverloads constructor(
 
             if (newDist > MIN_DISTANCE_MULTITOUCH) {
                 currMatrix.set(savedMatrix)
-                applyZoom(event)
+                if (isSupportZoom) applyZoom(event)
             }
 
             if (needSkipRotationEvent.not() && event.pointerCount == 2 || event.pointerCount == 3)
