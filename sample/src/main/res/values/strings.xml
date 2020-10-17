@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Moki Image Zoom</string>
+    <string name="sample_choose_image_from_gallery">Gallery</string>
 </resources>
