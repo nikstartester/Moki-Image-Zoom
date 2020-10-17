@@ -36,7 +36,7 @@ class ImageZoomView @JvmOverloads constructor(
     private companion object {
         //region DEFAULT_PARAMS
         const val SUPPORT_ZOOM = true
-        const val SUPPORT_TRANSLATE = false
+        const val SUPPORT_TRANSLATE_WHEN_IMAGE_IN_SCREEN_BOUNDS = false
         const val SUPPORT_ROTATE = false
 
         const val MAX_ZOOM = 3f
@@ -76,9 +76,10 @@ class ImageZoomView @JvmOverloads constructor(
     var isSupportZoom = SUPPORT_ZOOM
 
     /**
-     *  Support translate flag
+     *  Support translate when image in screen bounds
      */
-    var isSupportTranslate = SUPPORT_TRANSLATE
+    // TODO: add support after add max screen offset
+    var isSupportTranslateWhenImageInScreenBounds = SUPPORT_TRANSLATE_WHEN_IMAGE_IN_SCREEN_BOUNDS
 
     /**
      *  Support rotate flag
