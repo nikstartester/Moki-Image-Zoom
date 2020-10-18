@@ -41,16 +41,11 @@ class ImageZoomView @JvmOverloads constructor(
         // TODO: true
         const val SUPPORT_DOUBLE_TAP = false
 
-        // TODO: > 0?
-        const val MAX_SCREEN_OFFSET = -1f
-
         // TODO: true
         const val USE_RETURN_ANIM_FROM_MAX_OR_MIN_ZOOM = false
         //endregion
 
         const val MIN_DISTANCE_MULTITOUCH = 10f
-
-        const val MATRIX_VALUES_ARRAY_SIZE = 9
     }
 
     /**
