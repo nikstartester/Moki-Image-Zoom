@@ -3,10 +3,7 @@
 package com.xando.moki.image_zoom.view
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Matrix
-import android.graphics.PointF
-import android.graphics.RectF
+import android.graphics.*
 import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.util.Size
@@ -36,7 +33,6 @@ class ImageZoomView @JvmOverloads constructor(
     private companion object {
         //region DEFAULT_PARAMS
         const val SUPPORT_ZOOM = true
-        const val SUPPORT_TRANSLATE_WHEN_IMAGE_IN_SCREEN_BOUNDS = false
         const val SUPPORT_ROTATE = false
 
         const val MAX_ZOOM = 3f
@@ -76,12 +72,6 @@ class ImageZoomView @JvmOverloads constructor(
     var isSupportZoom = SUPPORT_ZOOM
 
     /**
-     *  Support translate when image in screen bounds
-     */
-    // TODO: add support after add max screen offset
-    var isSupportTranslateWhenImageInScreenBounds = SUPPORT_TRANSLATE_WHEN_IMAGE_IN_SCREEN_BOUNDS
-
-    /**
      *  Support rotate flag
      */
     var isSupportRotate = SUPPORT_ROTATE
@@ -111,25 +101,19 @@ class ImageZoomView @JvmOverloads constructor(
     var supportDoubleTap = SUPPORT_DOUBLE_TAP
 
     /**
-     * The maximum limit for which the image can go beyond the screen.
-     * If current offset is greater than value you want set, image will move automatically to fit
-     * into your offset.
-     * If [maxScreenOffset] < 0 image can go away from the screen.
-     */
-    // TODO: add max offset limit
-    var maxScreenOffset = MAX_SCREEN_OFFSET
-        set(value) {
-            field = value
-            invalidateScreenOffset()
-        }
-
-    /**
      * If 'true' when zoom value is greater than [maxZoom] or less than [minZoom] with multi touch,
      * image zoom will go beyond the limits and when point up, zoom return to limits [maxZoom]
      * or [minZoom] with animation
      */
     // TODO: add return zoom anim support
     var useReturnAnimFromMaxOrMinZoom = USE_RETURN_ANIM_FROM_MAX_OR_MIN_ZOOM
+
+    // TODO: add support for changes
+    var boundsLimit: Rect? = null
+        set(value) {
+            field = value
+            invalidateBoundsLimit()
+        }
     //endregion
 
     private var currMatrix = Matrix()
@@ -151,6 +135,8 @@ class ImageZoomView @JvmOverloads constructor(
     private var isDrawn = false
 
     private var sceneDataAfterDraw: ImageZoomScene? = null
+
+    private var lastTranslate = PointF()
 
     init {
         setOnTouchListener(this)
@@ -209,9 +195,8 @@ class ImageZoomView @JvmOverloads constructor(
      */
     fun getPointTranslate(): PointF =
         if (drawable != null) Utils.getPointTranslate(
-            getActualRotation(),
             currMatrix,
-            Size(drawable.intrinsicWidth, drawable.intrinsicHeight)
+            getDrawableSize()
         ) else PointF()
 
     override fun onDraw(canvas: Canvas?) {
@@ -233,10 +218,10 @@ class ImageZoomView @JvmOverloads constructor(
 
     override fun onTouch(v: View?, event: MotionEvent): Boolean {
         when (event.action and MotionEvent.ACTION_MASK) {
-            MotionEvent.ACTION_DOWN ->                              onActionDown(event)
-            MotionEvent.ACTION_POINTER_DOWN ->                      onActionPointerDown(event)
+            MotionEvent.ACTION_DOWN -> onActionDown(event)
+            MotionEvent.ACTION_POINTER_DOWN -> onActionPointerDown(event)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> onActionUp()
-            MotionEvent.ACTION_MOVE ->                              onActionMove(event)
+            MotionEvent.ACTION_MOVE -> onActionMove(event)
         }
 
         saveTouchChanges()
@@ -249,13 +234,14 @@ class ImageZoomView @JvmOverloads constructor(
         // TODO: add invalidate zoom
     }
 
-    private fun invalidateScreenOffset() {
-        // TODO: add invalidate screen offset
+    private fun invalidateBoundsLimit() {
+        // TODO: add invalidate bounds
     }
 
     private fun onActionDown(event: MotionEvent) {
         savedMatrix.set(currMatrix)
         startTouchPoint[event.x] = event.y
+        lastTranslate = PointF()
         touchMode = TouchState.DRAG
         needSkipRotationEvent = true
     }
@@ -280,7 +266,7 @@ class ImageZoomView @JvmOverloads constructor(
         if (touchMode == TouchState.DRAG) {
             currMatrix.set(savedMatrix)
 
-            applyTranslate(event)
+            applyTranslate(getDeltaOfTouchWithBounds(event))
         } else if (touchMode == TouchState.MULTI_TOUCH) {
             val newDist = Utils.getSpacing(event)
 
@@ -304,11 +290,22 @@ class ImageZoomView @JvmOverloads constructor(
         middleTouchPoint[middlePoint.x] = middlePoint.y
     }
 
-    private fun applyTranslate(event: MotionEvent) {
-        val dx = event.x - startTouchPoint.x
-        val dy = event.y - startTouchPoint.y
+    private fun getDeltaOfTouchWithBounds(event: MotionEvent): PointF =
+        drawable?.let {
+            Utils.getDeltaOfTouchWithBounds(
+                event,
+                startTouchPoint,
+                currMatrix,
+                getDrawableSize(),
+                boundsLimit ?: Rect(0, 0, width, height)
+            )
+        } ?: PointF()
 
+    private fun applyTranslate(delta: PointF) {
+        val dx = delta.x.takeIf { it != 0f } ?: lastTranslate.x
+        val dy = delta.y.takeIf { it != 0f } ?: lastTranslate.y
         currMatrix.postTranslate(dx, dy)
+        lastTranslate = PointF(dx, dy)
     }
 
     private fun applyZoom(event: MotionEvent) {
@@ -328,11 +325,21 @@ class ImageZoomView @JvmOverloads constructor(
         val scale = minScale.coerceAtLeast((newScale).coerceAtMost(maxScale))
 
         currMatrix.postScale(scale, scale, middleTouchPoint.x, middleTouchPoint.y)
+        applyCentering()
     }
 
     private fun applyRotate(event: MotionEvent) {
         val newAngle = Utils.getAngle(event)
         val rotation = newAngle - lastAngle
         currMatrix.postRotate(rotation, middleTouchPoint.x, middleTouchPoint.y)
+        applyCentering()
+    }
+
+    private fun getDrawableSize() =
+        drawable?.let { Size(it.intrinsicWidth, it.intrinsicHeight) } ?: Size(0, 0)
+
+    private fun applyCentering() {
+        val rect = Utils.getDeltaToCentering(currMatrix, getDrawableSize(), Size(width, height))
+        if (rect.x != 0f || rect.y != 0f) currMatrix.postTranslate(rect.x, rect.y)
     }
 }
